@@ -14,7 +14,7 @@ local activateOnCharged = 1
 -- ====== INTERNALS ======
 os.loadAPI("lib/f")
 
-local version        = "0.28"
+local version        = "0.29"
 local autoInputGate  = 1
 local curInputGate   = 222000
 
@@ -104,20 +104,24 @@ local function buttons()
     end
 
     if yPos == 10 and autoInputGate == 0 then
-      if not (xPos >= 2 and xPos <= 3) then -- ignore clicks on "MA"
-        for _, b in ipairs(inputButtons) do
-          if xPos >= b.x1+6 and xPos <= b.x2+6 then
-            curInputGate = curInputGate + b.change
-          end
+      -- handle MA buttons (shifted)
+      local centerShift = math.floor((monX - 28) / 2) -- buttons width = 28
+      for _, b in ipairs(inputButtons) do
+        if xPos >= b.x1 + centerShift and xPos <= b.x2 + centerShift then
+          curInputGate = curInputGate + b.change
         end
-        inputfluxgate.setSignalLowFlow(curInputGate)
-        save_config()
       end
+      inputfluxgate.setSignalLowFlow(curInputGate)
+      save_config()
     end
 
-    if yPos == 10 and (xPos >= 2 and xPos <= 3) then
-      autoInputGate = 1 - autoInputGate
-      save_config()
+    -- toggle AU/MA
+    if yPos == 10 then
+      local textX = math.floor((monX - 2)/2) + 1 -- center text width=2
+      if xPos >= textX and xPos <= textX+1 then
+        autoInputGate = 1 - autoInputGate
+        save_config()
+      end
     end
   end
 end
@@ -171,16 +175,19 @@ local function update()
     monitor.setCursorPos(1, 10)
     monitor.write(string.rep(" ", mon.X))
 
-    -- Draw AU/MA toggle
+    -- Draw centered AU/MA toggle
+    local modeText = autoInputGate == 1 and "AU" or "MA"
+    local textX = math.floor((monX - #modeText) / 2) + 1
     monitor.setBackgroundColor(colors.gray)
     monitor.setTextColor(colors.white)
-    monitor.setCursorPos(2, 10)
-    if autoInputGate == 1 then
-      monitor.write("AU")
-    else
-      monitor.write("MA")
-      -- Draw buttons shifted right so they don’t cover label
-      drawButtonsRow(10, inputButtons, 6)
+    monitor.setCursorPos(textX, 10)
+    monitor.write(modeText)
+
+    -- Draw buttons centered if MA
+    if autoInputGate == 0 then
+      local buttonsWidth = 28
+      local shift = math.floor((monX - buttonsWidth) / 2)
+      drawButtonsRow(10, inputButtons, shift)
     end
 
     local satPercent = math.ceil(ri.energySaturation / ri.maxEnergySaturation * 10000) * .01
