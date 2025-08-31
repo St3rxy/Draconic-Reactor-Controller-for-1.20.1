@@ -14,7 +14,7 @@ local activateOnCharged = 1
 -- ====== INTERNALS ======
 os.loadAPI("lib/f")
 
-local version        = "0.25"
+local version        = "0.26"
 local autoInputGate  = 1
 local curInputGate   = 222000
 
@@ -60,8 +60,7 @@ end
 
 if not fs.exists("config.txt") then save_config() else load_config() end
 
--- ====== BUTTONS (shared coordinates for draw + touch) ======
--- Fixed positions to match original behavior
+-- ====== BUTTONS ======
 local outputButtons = {
   {x1=2,  x2=4,  change=-1000,   label=" < "},
   {x1=6,  x2=9,  change=-10000,  label=" <<"},
@@ -80,14 +79,11 @@ local inputButtons = {
   {x1=25, x2=27, change= 1000,   label=" > "},
 }
 
--- Draw a whole row of buttons WITHOUT clearing per button
 local function drawButtonsRow(y, buttons)
-  -- clear the row once
   monitor.setBackgroundColor(colors.black)
   monitor.setCursorPos(1, y)
   monitor.write(string.rep(" ", mon.X))
 
-  -- draw every button on that row
   monitor.setTextColor(colors.white)
   for _, b in ipairs(buttons) do
     monitor.setBackgroundColor(colors.gray)
@@ -101,7 +97,6 @@ local function buttons()
   while true do
     local event, side, xPos, yPos = os.pullEvent("monitor_touch")
 
-    -- Output gate buttons (row 8)
     if yPos == 8 then
       local cFlow = fluxgate.getSignalLowFlow()
       for _, b in ipairs(outputButtons) do
@@ -112,9 +107,7 @@ local function buttons()
       fluxgate.setSignalLowFlow(cFlow)
     end
 
-    -- Input gate buttons (row 10) when MANUAL (MA)
     if yPos == 10 and autoInputGate == 0 then
-      -- AU/MA toggle occupies x=14..15; ignore button changes on those cells
       if not (xPos == 14 or xPos == 15) then
         for _, b in ipairs(inputButtons) do
           if xPos >= b.x1 and xPos <= b.x2 then
@@ -126,9 +119,8 @@ local function buttons()
       end
     end
 
-    -- AU/MA toggle at row 10, x 14..15
     if yPos == 10 and (xPos == 14 or xPos == 15) then
-      autoInputGate = 1 - autoInputGate  -- toggle 1 <-> 0
+      autoInputGate = 1 - autoInputGate
       save_config()
     end
   end
@@ -150,12 +142,11 @@ local function update()
     ri = reactor.getReactorInfo()
     if ri == nil then error("reactor has an invalid setup") end
 
-    -- debug to terminal (window)
+    -- debug
     for k, v in pairs(ri) do print(k .. ": " .. tostring(v)) end
     print("Output Gate: ", fluxgate.getSignalLowFlow())
     print("Input Gate: ", inputfluxgate.getSignalLowFlow())
 
-    -- status color
     local statusColor = colors.red
     if ri.status == "online" or ri.status == "charged" then
       statusColor = colors.green
@@ -178,15 +169,17 @@ local function update()
     drawButtonsRow(8, outputButtons)
 
     f.draw_text_lr(mon, 2, 9, 1, "Input Gate", f.format_int(inputfluxgate.getSignalLowFlow()) .. " rf/t", colors.white, colors.blue, colors.black)
+
+    -- Fix AU/MA toggle drawing
+    monitor.setBackgroundColor(colors.black)
+    monitor.setCursorPos(1, 10)
+    monitor.write(string.rep(" ", mon.X))
+
     if autoInputGate == 1 then
-      -- AU badge (no per-label clear)
       monitor.setBackgroundColor(colors.gray)
       monitor.setTextColor(colors.white)
       monitor.setCursorPos(14, 10)
       monitor.write("AU")
-      -- do NOT draw input buttons in AU
-      -- clear row except AU for cleanliness
-      -- (optional; already clean because we redraw every frame)
     else
       monitor.setBackgroundColor(colors.gray)
       monitor.setTextColor(colors.white)
@@ -222,23 +215,19 @@ local function update()
 
     f.draw_text_lr(mon, 2, 19, 1, "Action ", action, colors.gray, colors.gray, colors.black)
 
-    -- ====== CONTROL LOGIC ======
+    -- CONTROL LOGIC
     if emergencyCharge then reactor.chargeReactor() end
-
     if ri.status == "charging" then
       inputfluxgate.setSignalLowFlow(900000)
       emergencyCharge = false
     end
-
     if emergencyTemp and ri.status == "stopping" and ri.temperature < safeTemperature then
       reactor.activateReactor()
       emergencyTemp = false
     end
-
     if ri.status == "charged" and activateOnCharged == 1 then
       reactor.activateReactor()
     end
-
     if ri.status == "running" or ri.status == "online" then
       if autoInputGate == 1 then
         local fluxval = ri.fieldDrainRate / (1 - (targetStrength/100))
@@ -248,26 +237,22 @@ local function update()
         inputfluxgate.setSignalLowFlow(curInputGate)
       end
     end
-
     if fuelPercent <= 10 then
       reactor.stopReactor()
       action = "Fuel below 10%, refuel"
     end
-
     if fieldPercent <= lowestFieldPercent and (ri.status == "online" or ri.status == "running") then
       action = "Field Str < " .. lowestFieldPercent .. "%"
       reactor.stopReactor()
       reactor.chargeReactor()
       emergencyCharge = true
     end
-
     if ri.temperature > maxTemperature then
       reactor.stopReactor()
       action = "Temp > " .. maxTemperature
       emergencyTemp = true
     end
 
-    -- push buffered frame
     win.redraw()
     sleep(0.2)
   end
