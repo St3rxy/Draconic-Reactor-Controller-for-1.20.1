@@ -1,3 +1,5 @@
+-- drmon.lua
+
 -- modifiable variables
 local reactorSide = "back"
 local fluxgateSide = "right"
@@ -13,7 +15,6 @@ local activateOnCharged = 1
 os.loadAPI("lib/f")
 
 local version = "0.25"
--- toggleable via the monitor, use our algorithm to achieve our target field strength or let the user tweak it
 local autoInputGate = 1
 local curInputGate = 222000
 
@@ -38,19 +39,19 @@ inputfluxgate = f.periphSearch("flow_gate")
 fluxgate = peripheral.wrap(fluxgateSide)
 reactor = peripheral.wrap(reactorSide)
 
-if monitor == null then
+if monitor == nil then
 	error("No valid monitor was found")
 end
 
-if fluxgate == null then
+if fluxgate == nil then
 	error("No valid fluxgate was found")
 end
 
-if reactor == null then
+if reactor == nil then
 	error("No valid reactor was found")
 end
 
-if inputfluxgate == null then
+if inputfluxgate == nil then
 	error("No valid flux gate was found")
 end
 
@@ -76,7 +77,6 @@ function load_config()
   sr.close()
 end
 
-
 -- 1st time? save our settings, if not, load our settings
 if fs.exists("config.txt") == false then
   save_config()
@@ -84,82 +84,74 @@ else
   load_config()
 end
 
+-- ======================================================
+-- BUTTONS
+-- ======================================================
+
+-- Button definitions
+local outputButtons = {
+  {x1=2,  x2=4,  change=-1000,  label=" < "},
+  {x1=6,  x2=9,  change=-10000, label=" <<"},
+  {x1=10, x2=12, change=-100000,label="<<<"},
+  {x1=17, x2=19, change=100000, label=">>>"},
+  {x1=21, x2=23, change=10000,  label=">> "},
+  {x1=25, x2=27, change=1000,   label=" > "}
+}
+
+local inputButtons = {
+  {x1=2,  x2=4,  change=-1000,  label=" < "},
+  {x1=6,  x2=9,  change=-10000, label=" <<"},
+  {x1=10, x2=12, change=-100000,label="<<<"},
+  {x1=17, x2=19, change=100000, label=">>>"},
+  {x1=21, x2=23, change=10000,  label=">> "},
+  {x1=25, x2=27, change=1000,   label=" > "}
+}
+
+-- Draw a row of buttons at position y
+local function drawButtons(buttons, y)
+  for _, b in ipairs(buttons) do
+    f.draw_text(mon, b.x1, y, b.label, colors.white, colors.gray)
+  end
+end
+
+-- Button handler
 function buttons()
-
   while true do
-    -- button handler
-    event, side, xPos, yPos = os.pullEvent("monitor_touch")
+    local event, side, xPos, yPos = os.pullEvent("monitor_touch")
 
-    -- output gate controls
-    -- 2-4 = -1000, 6-9 = -10000, 10-12,8 = -100000
-    -- 17-19 = +1000, 21-23 = +10000, 25-27 = +100000
+    -- Output gate buttons (row 8)
     if yPos == 8 then
       local cFlow = fluxgate.getSignalLowFlow()
-      if xPos >= 2 and xPos <= 4 then
-        cFlow = cFlow-1000
-      elseif xPos >= 6 and xPos <= 9 then
-        cFlow = cFlow-10000
-      elseif xPos >= 10 and xPos <= 12 then
-        cFlow = cFlow-100000
-      elseif xPos >= 17 and xPos <= 19 then
-        cFlow = cFlow+100000
-      elseif xPos >= 21 and xPos <= 23 then
-        cFlow = cFlow+10000
-      elseif xPos >= 25 and xPos <= 27 then
-        cFlow = cFlow+1000
+      for _, b in ipairs(outputButtons) do
+        if xPos >= b.x1 and xPos <= b.x2 then
+          cFlow = cFlow + b.change
+        end
       end
       fluxgate.setSignalLowFlow(cFlow)
     end
 
-    -- input gate controls
-    -- 2-4 = -1000, 6-9 = -10000, 10-12,8 = -100000
-    -- 17-19 = +1000, 21-23 = +10000, 25-27 = +100000
-    if yPos == 10 and autoInputGate == 0 and xPos ~= 14 and xPos ~= 15 then
-      if xPos >= 2 and xPos <= 4 then
-        curInputGate = curInputGate-1000
-      elseif xPos >= 6 and xPos <= 9 then
-        curInputGate = curInputGate-10000
-      elseif xPos >= 10 and xPos <= 12 then
-        curInputGate = curInputGate-100000
-      elseif xPos >= 17 and xPos <= 19 then
-        curInputGate = curInputGate+100000
-      elseif xPos >= 21 and xPos <= 23 then
-        curInputGate = curInputGate+10000
-      elseif xPos >= 25 and xPos <= 27 then
-        curInputGate = curInputGate+1000
+    -- Input gate buttons (row 10)
+    if yPos == 10 and autoInputGate == 0 and (xPos ~= 14 and xPos ~= 15) then
+      for _, b in ipairs(inputButtons) do
+        if xPos >= b.x1 and xPos <= b.x2 then
+          curInputGate = curInputGate + b.change
+        end
       end
       inputfluxgate.setSignalLowFlow(curInputGate)
       save_config()
     end
 
-    -- input gate toggle
-    if yPos == 10 and ( xPos == 14 or xPos == 15) then
-      if autoInputGate == 1 then
-        autoInputGate = 0
-      else
-        autoInputGate = 1
-      end
+    -- Input gate toggle (AU/MA)
+    if yPos == 10 and (xPos == 14 or xPos == 15) then
+      autoInputGate = 1 - autoInputGate -- toggle between 1 and 0
       save_config()
     end
-
   end
 end
 
-function drawButtons(y)
-
-  -- 2-4 = -1000, 6-9 = -10000, 10-12,8 = -100000
-  -- 17-19 = +1000, 21-23 = +10000, 25-27 = +100000
-
-  f.draw_text(mon, 2, y, " < ", colors.white, colors.gray)
-  f.draw_text(mon, 6, y, " <<", colors.white, colors.gray)
-  f.draw_text(mon, 10, y, "<<<", colors.white, colors.gray)
-
-  f.draw_text(mon, 17, y, ">>>", colors.white, colors.gray)
-  f.draw_text(mon, 21, y, ">> ", colors.white, colors.gray)
-  f.draw_text(mon, 25, y, " > ", colors.white, colors.gray)
-end
-
-
+-- ======================================================
+-- MAIN UPDATE LOOP
+-- ======================================================
 
 -- create buffered window for monitor output
 local win = window.create(monitor, 1, 1, monX, monY, false)
@@ -169,25 +161,23 @@ term.redirect(win)
 
 function update()
   while true do
-    -- clear only the buffer, not the real monitor
     win.setBackgroundColor(colors.black)
     win.clear()
     win.setCursorPos(1,1)
 
     ri = reactor.getReactorInfo()
-
     if ri == nil then
       error("reactor has an invalid setup")
     end
 
-    -- print infos to terminal (for debugging, not the monitor)
+    -- Debug output
     for k, v in pairs (ri) do
       print(k.. ": ".. tostring(v))
     end
     print("Output Gate: ", fluxgate.getSignalLowFlow())
     print("Input Gate: ", inputfluxgate.getSignalLowFlow())
 
-    -- monitor output
+    -- === Monitor output ===
     local statusColor = colors.red
     if ri.status == "online" or ri.status == "charged" then
       statusColor = colors.green
@@ -207,8 +197,8 @@ function update()
 
     f.draw_text_lr(mon, 2, 7, 1, "Output Gate", f.format_int(fluxgate.getSignalLowFlow()) .. " rf/t", colors.white, colors.blue, colors.black)
 
-    -- buttons
-    drawButtons(8)
+    -- Output buttons
+    drawButtons(outputButtons, 8)
 
     f.draw_text_lr(mon, 2, 9, 1, "Input Gate", f.format_int(inputfluxgate.getSignalLowFlow()) .. " rf/t", colors.white, colors.blue, colors.black)
 
@@ -216,7 +206,7 @@ function update()
       f.draw_text(mon, 14, 10, "AU", colors.white, colors.gray)
     else
       f.draw_text(mon, 14, 10, "MA", colors.white, colors.gray)
-      drawButtons(10)
+      drawButtons(inputButtons, 10)
     end
 
     local satPercent = math.ceil(ri.energySaturation / ri.maxEnergySaturation * 10000)*.01
@@ -245,7 +235,7 @@ function update()
 
     f.draw_text_lr(mon, 2, 19, 1, "Action ", action, colors.gray, colors.gray, colors.black)
 
-    -- === reactor management logic (unchanged) ===
+    -- === Reactor management logic ===
     if emergencyCharge == true then
       reactor.chargeReactor()
     end
@@ -292,11 +282,10 @@ function update()
       emergencyTemp = true
     end
 
-    -- === flush buffered frame ===
+    -- === Flush buffer to monitor ===
     win.redraw()
 
-    -- slower refresh to reduce flicker
-    sleep(0.2)
+    sleep(0.2) -- slower refresh = less flicker
   end
 end
 
