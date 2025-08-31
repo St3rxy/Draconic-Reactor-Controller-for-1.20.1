@@ -14,7 +14,7 @@ local activateOnCharged = 1
 -- ====== INTERNALS ======
 os.loadAPI("lib/f")
 
-local version        = "0.26"
+local version        = "0.27"
 local autoInputGate  = 1
 local curInputGate   = 222000
 
@@ -170,22 +170,24 @@ local function update()
 
     f.draw_text_lr(mon, 2, 9, 1, "Input Gate", f.format_int(inputfluxgate.getSignalLowFlow()) .. " rf/t", colors.white, colors.blue, colors.black)
 
-    -- Fix AU/MA toggle drawing
+    -- AU/MA toggle + buttons
     monitor.setBackgroundColor(colors.black)
     monitor.setCursorPos(1, 10)
     monitor.write(string.rep(" ", mon.X))
 
     if autoInputGate == 1 then
+      -- AU mode
       monitor.setBackgroundColor(colors.gray)
       monitor.setTextColor(colors.white)
       monitor.setCursorPos(14, 10)
       monitor.write("AU")
     else
-      monitor.setBackgroundColor(colors.gray)
+      -- MA mode: draw buttons, then MA on top
+      drawButtonsRow(10, inputButtons)
+      monitor.setBackgroundColor(colors.black)
       monitor.setTextColor(colors.white)
       monitor.setCursorPos(14, 10)
       monitor.write("MA")
-      drawButtonsRow(10, inputButtons)
     end
 
     local satPercent = math.ceil(ri.energySaturation / ri.maxEnergySaturation * 10000) * .01
