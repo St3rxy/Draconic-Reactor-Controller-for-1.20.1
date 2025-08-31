@@ -256,7 +256,7 @@ local function update()
     end
 
     win.redraw()
-    sleep(0.2)
+    sleep(0.1)
   end
 end
 
