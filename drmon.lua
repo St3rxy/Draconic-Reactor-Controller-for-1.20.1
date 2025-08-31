@@ -14,7 +14,7 @@ local activateOnCharged = 1
 -- ====== INTERNALS ======
 os.loadAPI("lib/f")
 
-local version        = "0.27"
+local version        = "0.28"
 local autoInputGate  = 1
 local curInputGate   = 222000
 
@@ -79,15 +79,11 @@ local inputButtons = {
   {x1=25, x2=27, change= 1000,   label=" > "},
 }
 
-local function drawButtonsRow(y, buttons)
-  monitor.setBackgroundColor(colors.black)
-  monitor.setCursorPos(1, y)
-  monitor.write(string.rep(" ", mon.X))
-
+local function drawButtonsRow(y, buttons, xShift)
   monitor.setTextColor(colors.white)
   for _, b in ipairs(buttons) do
     monitor.setBackgroundColor(colors.gray)
-    monitor.setCursorPos(b.x1, y)
+    monitor.setCursorPos(b.x1 + (xShift or 0), y)
     monitor.write(b.label)
   end
 end
@@ -108,9 +104,9 @@ local function buttons()
     end
 
     if yPos == 10 and autoInputGate == 0 then
-      if not (xPos == 14 or xPos == 15) then
+      if not (xPos >= 2 and xPos <= 3) then -- ignore clicks on "MA"
         for _, b in ipairs(inputButtons) do
-          if xPos >= b.x1 and xPos <= b.x2 then
+          if xPos >= b.x1+6 and xPos <= b.x2+6 then
             curInputGate = curInputGate + b.change
           end
         end
@@ -119,7 +115,7 @@ local function buttons()
       end
     end
 
-    if yPos == 10 and (xPos == 14 or xPos == 15) then
+    if yPos == 10 and (xPos >= 2 and xPos <= 3) then
       autoInputGate = 1 - autoInputGate
       save_config()
     end
@@ -166,28 +162,25 @@ local function update()
     f.draw_text_lr(mon, 2, 6, 1, "Temperature", f.format_int(ri.temperature) .. "C", colors.white, tempColor, colors.black)
 
     f.draw_text_lr(mon, 2, 7, 1, "Output Gate", f.format_int(fluxgate.getSignalLowFlow()) .. " rf/t", colors.white, colors.blue, colors.black)
-    drawButtonsRow(8, outputButtons)
+    drawButtonsRow(8, outputButtons, 0)
 
     f.draw_text_lr(mon, 2, 9, 1, "Input Gate", f.format_int(inputfluxgate.getSignalLowFlow()) .. " rf/t", colors.white, colors.blue, colors.black)
 
-    -- AU/MA toggle + buttons
+    -- Clear line 10
     monitor.setBackgroundColor(colors.black)
     monitor.setCursorPos(1, 10)
     monitor.write(string.rep(" ", mon.X))
 
+    -- Draw AU/MA toggle
+    monitor.setBackgroundColor(colors.gray)
+    monitor.setTextColor(colors.white)
+    monitor.setCursorPos(2, 10)
     if autoInputGate == 1 then
-      -- AU mode
-      monitor.setBackgroundColor(colors.gray)
-      monitor.setTextColor(colors.white)
-      monitor.setCursorPos(14, 10)
       monitor.write("AU")
     else
-      -- MA mode: draw buttons, then MA on top
-      drawButtonsRow(10, inputButtons)
-      monitor.setBackgroundColor(colors.black)
-      monitor.setTextColor(colors.white)
-      monitor.setCursorPos(14, 10)
       monitor.write("MA")
+      -- Draw buttons shifted right so they don’t cover label
+      drawButtonsRow(10, inputButtons, 6)
     end
 
     local satPercent = math.ceil(ri.energySaturation / ri.maxEnergySaturation * 10000) * .01
@@ -256,7 +249,7 @@ local function update()
     end
 
     win.redraw()
-    sleep(0.05)
+    sleep(0.2)
   end
 end
 
