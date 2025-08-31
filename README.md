@@ -8,3 +8,9 @@ The code has been modified using AI because I don't know how to program, but I w
 
 All credit goes to the creators of the original code.
 https://github.com/acidjazz/drmon
+
+
+To start id do:
+> pastebin get JJ2Zhffz install
+> install
+> startup
