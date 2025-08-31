@@ -11,6 +11,4 @@ https://github.com/acidjazz/drmon
 
 
 To start id do:
-> pastebin get JJ2Zhffz install
-> install
-> startup
+<pre> ```bash > pastebin get JJ2Zhffz install > install ``` </pre>
